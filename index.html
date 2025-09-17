@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Escáner QR Único</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            color: #22223b;
+        }
+        .container {
+            max-width: 420px;
+            margin: 32px auto;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(30, 41, 59, 0.10);
+            padding: 28px 18px 24px 18px;
+        }
+        h1 {
+            text-align: center;
+            color: #2563eb;
+            margin-bottom: 18px;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .range-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .range-inputs label {
+            font-weight: 500;
+            color: #334155;
+        }
+        .range-inputs input {
+            width: 70px;
+            padding: 5px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1em;
+            margin-left: 3px;
+        }
+        button {
+            background: linear-gradient(90deg, #2563eb 60%, #22d3ee 100%);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            padding: 8px 18px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px 0 16px 0;
+            transition: background 0.2s;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+        }
+        button:hover {
+            background: linear-gradient(90deg, #1e40af 60%, #06b6d4 100%);
+        }
+        #reader {
+            width: 100% !important;
+            max-width: 320px;
+            margin: 0 auto 10px auto;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(30, 41, 59, 0.10);
+            background: #f1f5f9;
+        }
+        #message {
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: 600;
+            padding: 7px 0;
+            border-radius: 6px;
+            min-height: 28px;
+        }
+        #message.red {
+            color: #fff;
+            background: #ef4444;
+            border: 1px solid #b91c1c;
+        }
+        #message.green {
+            color: #fff;
+            background: #22c55e;
+            border: 1px solid #15803d;
+        }
+        #scanned-list {
+            margin-top: 18px;
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 1em;
+            min-height: 40px;
+            box-shadow: 0 1px 4px rgba(30, 41, 59, 0.06);
+        }
+        #scanned-list b {
+            color: #2563eb;
+        }
+        @media (max-width: 600px) {
+            .container {
+                max-width: 98vw;
+                padding: 10px 2vw 18px 2vw;
+            }
+            #reader {
+                max-width: 98vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Escáner QR Único</h1>
+        <div class="range-inputs">
+            <label>Desde: <input type="number" id="rangeStart" value="1"></label>
+            <label>Hasta: <input type="number" id="rangeEnd" value="100"></label>
+            <button onclick="setRange()">Rango</button>
+        </div>
+        <div id="reader"></div>
+        <div id="message"></div>
+        <button onclick="exportPDF()" style="width:100%;">Exportar a PDF</button>
+        <div id="scanned-list"></div>
+    </div>
+
+    <audio id="successSound" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa4b7b.mp3"></audio>
+    <audio id="errorSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b7b7c.mp3"></audio>
+
+    <script>
+        let scanned = new Set();
+        let scannedArr = [];
+        let rangeStart = 1, rangeEnd = 100;
+
+        function setRange() {
+            rangeStart = parseInt(document.getElementById('rangeStart').value);
+            rangeEnd = parseInt(document.getElementById('rangeEnd').value);
+            showMessage(`Rango actualizado: ${rangeStart} - ${rangeEnd}`, 'green');
+        }
+
+        function showMessage(msg, color) {
+            const el = document.getElementById('message');
+            el.textContent = msg;
+            el.className = color;
+        }
+
+        function vibrate(ms) {
+            if (navigator.vibrate) navigator.vibrate(ms);
+        }
+
+        function playSound(id) {
+            const audio = document.getElementById(id);
+            audio.currentTime = 0;
+            audio.play();
+        }
+
+        function updateList() {
+            document.getElementById('scanned-list').innerHTML =
+                scannedArr.length
+                ? "<b>Escaneados:</b><br>" + scannedArr.join('<br>')
+                : "<b>No hay códigos escaneados aún.</b>";
+        }
+
+        function isInRange(code) {
+            let num = parseInt(code);
+            return !isNaN(num) && num >= rangeStart && num <= rangeEnd;
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("Códigos escaneados:", 10, 15);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(12);
+            scannedArr.forEach((code, i) => {
+                doc.text(`${i+1}. ${code}`, 10, 25 + i*8);
+            });
+            doc.save("escaneados.pdf");
+        }
+
+        function onScanSuccess(decodedText) {
+            if (!isInRange(decodedText)) {
+                showMessage("Código fuera de rango", "red");
+                playSound('errorSound');
+                vibrate(300);
+                return;
+            }
+            if (scanned.has(decodedText)) {
+                showMessage("¡Ya escaneado!", "red");
+                playSound('errorSound');
+                vibrate(300);
+            } else {
+                scanned.add(decodedText);
+                scannedArr.push(decodedText);
+                showMessage("¡Escaneado correctamente!", "green");
+                playSound('successSound');
+                vibrate(100);
+                updateList();
+            }
+        }
+
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 10, qrbox: 250, aspectRatio: 1 });
+        html5QrcodeScanner.render(onScanSuccess);
+
+        // Inicializar lista vacía al cargar
+        updateList();
+    </script>
+</body>
+</html>
