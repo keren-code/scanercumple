@@ -135,6 +135,7 @@
         </div>
         <div id="message"></div>
         <button onclick="exportPDF()" style="width:100%;">Exportar a PDF</button>
+        <button onclick="clearRegistro()" style="width:100%;background:#ef4444;margin-bottom:10px;">Borrar registro</button>
         <div id="scanned-list"></div>
     </div>
 
@@ -142,8 +143,9 @@
     <audio id="errorSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b7b7c.mp3"></audio>
 
     <script>
-        let scanned = new Set();
-        let scannedArr = [];
+        // Utiliza localStorage para persistencia
+        let scanned = new Set(JSON.parse(localStorage.getItem('scannedArr') || "[]"));
+        let scannedArr = Array.from(scanned);
         let rangeStart = 1, rangeEnd = 100;
 
         function setRange() {
@@ -173,6 +175,16 @@
                 scannedArr.length
                 ? "<b>Escaneados:</b><br>" + scannedArr.join('<br>')
                 : "<b>No hay códigos escaneados aún.</b>";
+            // Actualiza localStorage
+            localStorage.setItem('scannedArr', JSON.stringify(scannedArr));
+        }
+
+        function clearRegistro() {
+            if (confirm("¿Seguro que deseas borrar todos los registros?")) {
+                scanned.clear();
+                scannedArr = [];
+                updateList();
+            }
         }
 
         // Feedback visual sobre el lector
@@ -243,13 +255,17 @@
             }
         }
 
+        // Manejo de error de cámara
+        function onScanError(errorMessage) {
+            showMessage("Error al acceder a la cámara. Verifica permisos y recarga la página.", "red");
+        }
+
         let html5QrcodeScanner = new Html5QrcodeScanner(
             "reader", { fps: 10, qrbox: 250, aspectRatio: 1 });
-        html5QrcodeScanner.render(onScanSuccess);
+        html5QrcodeScanner.render(onScanSuccess, onScanError);
 
         // Inicializar lista vacía al cargar
         updateList();
     </script>
 </body>
 </html>
-
