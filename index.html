@@ -126,7 +126,13 @@
             <label>Hasta: <input type="number" id="rangeEnd" value="100"></label>
             <button onclick="setRange()">Rango</button>
         </div>
-        <div id="reader"></div>
+        <div id="reader" style="position:relative;">
+            <!-- Iconos de feedback visual -->
+            <div id="scan-feedback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; text-align:center;">
+                <div id="feedback-icon" style="font-size:60px;"></div>
+                <div id="feedback-text" style="font-size:1.2em; font-weight:bold; margin-top:8px;"></div>
+            </div>
+        </div>
         <div id="message"></div>
         <button onclick="exportPDF()" style="width:100%;">Exportar a PDF</button>
         <div id="scanned-list"></div>
@@ -169,9 +175,28 @@
                 : "<b>No hay códigos escaneados aún.</b>";
         }
 
-        // Acepta "PASE LIBRE 001" en adelante, sin límite superior si rangeEnd es vacío
+        // Feedback visual sobre el lector
+        function showScanFeedback(type, message) {
+            const feedback = document.getElementById('scan-feedback');
+            const icon = document.getElementById('feedback-icon');
+            const text = document.getElementById('feedback-text');
+            if (type === 'success') {
+                icon.innerHTML = '✅';
+                icon.style.color = '#22c55e';
+                text.innerText = message || '¡Ingrese!';
+                text.style.color = '#22c55e';
+            } else if (type === 'error') {
+                icon.innerHTML = '❌';
+                icon.style.color = '#ef4444';
+                text.innerText = message || '¡Ya escaneado!';
+                text.style.color = '#ef4444';
+            }
+            feedback.style.display = 'block';
+            setTimeout(() => { feedback.style.display = 'none'; }, 1500);
+        }
+
+        // Acepta "PASE LIBRE 001" en adelante
         function isValidPaseLibre(code) {
-            // Permite mayúsculas/minúsculas y espacios extra
             const regex = /^PASE LIBRE (\d{3,})$/i;
             const match = code.trim().match(regex);
             if (!match) return false;
@@ -196,20 +221,22 @@
         function onScanSuccess(decodedText) {
             if (!isValidPaseLibre(decodedText)) {
                 showMessage("Solo se aceptan QR con formato: PASE LIBRE 001 en adelante", "red");
+                showScanFeedback('error', 'Formato inválido');
                 playSound('errorSound');
                 vibrate(300);
                 return;
             }
-            // Normaliza el texto para evitar duplicados por mayúsculas/minúsculas
             const normalized = decodedText.trim().toUpperCase();
             if (scanned.has(normalized)) {
                 showMessage("¡Ya escaneado!", "red");
+                showScanFeedback('error', '¡Ya escaneado!');
                 playSound('errorSound');
                 vibrate(300);
             } else {
                 scanned.add(normalized);
                 scannedArr.push(normalized);
                 showMessage("¡Escaneado correctamente!", "green");
+                showScanFeedback('success', '¡Ingrese!');
                 playSound('successSound');
                 vibrate(100);
                 updateList();
@@ -225,3 +252,4 @@
     </script>
 </body>
 </html>
+
