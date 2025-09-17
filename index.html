@@ -2,11 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Escáner QR Único</title>
+    <title>Escáner QR con Confirmación</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             box-sizing: border-box;
@@ -20,23 +21,26 @@
             min-height: 100vh;
             color: #22223b;
             touch-action: manipulation;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
         .container {
-            max-width: 100%;
             width: 100%;
-            margin: 0 auto;
+            max-width: 500px;
             background: #fff;
-            padding: 20px 15px;
-            min-height: 100vh;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(30, 41, 59, 0.10);
+            padding: 25px 20px;
+            text-align: center;
         }
         h1 {
-            text-align: center;
             color: #2563eb;
             margin: 0 0 20px 0;
             font-size: 1.8rem;
             font-weight: 700;
-            letter-spacing: 0.5px;
-            padding-top: 10px;
         }
         .range-inputs {
             display: flex;
@@ -67,13 +71,14 @@
             font-weight: 600;
             cursor: pointer;
             margin: 8px 0;
-            transition: background 0.2s;
+            transition: all 0.2s;
             box-shadow: 0 2px 8px rgba(37,99,235,0.08);
             width: 100%;
             touch-action: manipulation;
         }
         button:hover, button:active {
             background: linear-gradient(90deg, #1e40af 60%, #06b6d4 100%);
+            transform: translateY(-2px);
         }
         #reader {
             width: 100% !important;
@@ -84,10 +89,9 @@
             background: #f1f5f9;
             min-height: 250px;
             position: relative;
-        }
-        #reader__dashboard_section_csr {
-            background: white;
-            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         #message {
             font-size: 1.1em;
@@ -122,13 +126,46 @@
         #scanned-list b {
             color: #2563eb;
         }
-        .camera-controls {
+        .scan-result {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
         }
-        .camera-controls button {
-            flex: 1;
+        .scan-result.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .result-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        .scan-result.show .result-content {
+            transform: scale(1);
+        }
+        .result-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        .success {
+            color: #22c55e;
+        }
+        .error {
+            color: #ef4444;
         }
         .button-danger {
             background: linear-gradient(90deg, #ef4444 60%, #f87171 100%) !important;
@@ -142,43 +179,74 @@
             color: #64748b;
             font-size: 0.9rem;
         }
-        @media (min-width: 768px) {
-            .container {
-                max-width: 420px;
-                margin: 20px auto;
-                border-radius: 18px;
-                min-height: auto;
-            }
+        .scanner-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #ef4444;
+        }
+        .status-dot.active {
+            background-color: #22c55e;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Escáner QR Único</h1>
+        <h1>Escáner QR con Confirmación</h1>
         
         <div class="range-inputs">
             <label>Desde: <input type="number" id="rangeStart" value="1"></label>
             <label>Hasta: <input type="number" id="rangeEnd" value="100"></label>
-            <button onclick="setRange()">Establecer Rango</button>
         </div>
         
-        <div class="camera-controls">
-            <button onclick="initCamera()" id="startCameraBtn">Activar Cámara</button>
-            <button onclick="stopCamera()" class="button-danger" id="stopCameraBtn" disabled>Detener Cámara</button>
+        <div class="scanner-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Cámara desactivada</span>
         </div>
         
         <div class="scan-instructions">
-            Apunta la cámara hacia un código QR para escanearlo
+            Escaneará automáticamente al activar la cámara
         </div>
+        
+        <button onclick="toggleCamera()" id="cameraToggleBtn">
+            <i class="fas fa-camera"></i> Activar Cámara
+        </button>
         
         <div id="reader"></div>
         
         <div id="message"></div>
         
-        <button onclick="exportPDF()">Exportar a PDF</button>
-        <button onclick="clearRegistro()" class="button-danger">Borrar registro</button>
+        <button onclick="exportPDF()">
+            <i class="fas fa-file-pdf"></i> Exportar a PDF
+        </button>
+        <button onclick="clearRegistro()" class="button-danger">
+            <i class="fas fa-trash"></i> Borrar registro
+        </button>
         
         <div id="scanned-list"></div>
+    </div>
+
+    <div class="scan-result" id="scanResult">
+        <div class="result-content">
+            <div class="result-icon" id="resultIcon"></div>
+            <h2 id="resultText">Resultado</h2>
+            <button onclick="hideResult()">
+                <i class="fas fa-sync-alt"></i> Volver a escanear
+            </button>
+        </div>
     </div>
 
     <audio id="successSound" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa4b7b.mp3"></audio>
@@ -192,16 +260,27 @@
         let html5QrCode = null;
         let cameraActive = false;
 
+        // Elementos DOM
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const cameraToggleBtn = document.getElementById('cameraToggleBtn');
+        const scanResult = document.getElementById('scanResult');
+        const resultIcon = document.getElementById('resultIcon');
+        const resultText = document.getElementById('resultText');
+
+        // Alternar estado de la cámara
+        async function toggleCamera() {
+            if (cameraActive) {
+                await stopCamera();
+            } else {
+                await initCamera();
+            }
+        }
+
         // Inicializar la cámara
         async function initCamera() {
             try {
-                showMessage("Iniciando cámara...", "");
-                
-                // Verificar si ya hay una instancia activa
-                if (html5QrCode && html5QrCode.isScanning) {
-                    showMessage("La cámara ya está activa", "green");
-                    return;
-                }
+                showMessage("Activando cámara...", "");
                 
                 // Crear una nueva instancia del escáner
                 html5QrCode = new Html5Qrcode("reader");
@@ -214,35 +293,27 @@
                     focusMode: "continuous"
                 };
                 
-                // Obtener la cámara trasera por defecto en móviles
-                const cameras = await Html5Qrcode.getCameras();
-                let cameraId = null;
-                
-                if (cameras && cameras.length > 0) {
-                    // Preferir cámara trasera en dispositivos móviles
-                    const rearCamera = cameras.find(cam => cam.label.toLowerCase().includes('back'));
-                    cameraId = rearCamera ? rearCamera.id : cameras[0].id;
-                }
-                
                 // Iniciar el escáner
                 await html5QrCode.start(
-                    cameraId, 
+                    { facingMode: "environment" }, 
                     config, 
                     onScanSuccess, 
                     onScanError
                 );
                 
                 cameraActive = true;
-                document.getElementById('startCameraBtn').disabled = true;
-                document.getElementById('stopCameraBtn').disabled = false;
+                cameraToggleBtn.innerHTML = '<i class="fas fa-stop"></i> Detener Cámara';
+                statusDot.classList.add('active');
+                statusText.textContent = 'Escaneando...';
                 showMessage("Cámara activada. Escaneando...", "green");
                 
             } catch (error) {
                 console.error("Error al iniciar la cámara:", error);
-                showMessage("Error al activar la cámara: " + error.message, "red");
+                showMessage("Error al activar la cámara", "red");
                 cameraActive = false;
-                document.getElementById('startCameraBtn').disabled = false;
-                document.getElementById('stopCameraBtn').disabled = true;
+                cameraToggleBtn.innerHTML = '<i class="fas fa-camera"></i> Activar Cámara';
+                statusDot.classList.remove('active');
+                statusText.textContent = 'Error de activación';
             }
         }
 
@@ -253,14 +324,48 @@
                     await html5QrCode.stop();
                     html5QrCode.clear();
                     cameraActive = false;
-                    document.getElementById('startCameraBtn').disabled = false;
-                    document.getElementById('stopCameraBtn').disabled = true;
+                    cameraToggleBtn.innerHTML = '<i class="fas fa-camera"></i> Activar Cámara';
+                    statusDot.classList.remove('active');
+                    statusText.textContent = 'Cámara desactivada';
                     showMessage("Cámara detenida", "");
                 }
             } catch (error) {
                 console.error("Error al detener la cámara:", error);
                 showMessage("Error al detener la cámara", "red");
             }
+        }
+
+        // Mostrar resultado del escaneo
+        function showResult(success, message) {
+            if (success) {
+                resultIcon.className = 'result-icon success';
+                resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                resultText.textContent = message;
+                resultText.style.color = '#22c55e';
+            } else {
+                resultIcon.className = 'result-icon error';
+                resultIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
+                resultText.textContent = message;
+                resultText.style.color = '#ef4444';
+            }
+            
+            scanResult.classList.add('show');
+            
+            // Vibrar
+            if (navigator.vibrate) {
+                navigator.vibrate(success ? 100 : 300);
+            }
+            
+            // Reproducir sonido
+            playSound(success ? 'successSound' : 'errorSound');
+            
+            // Detener la cámara automáticamente
+            stopCamera();
+        }
+
+        // Ocultar resultado
+        function hideResult() {
+            scanResult.classList.remove('show');
         }
 
         function setRange() {
@@ -273,10 +378,6 @@
             const el = document.getElementById('message');
             el.textContent = msg;
             el.className = color ? color : '';
-        }
-
-        function vibrate(ms) {
-            if (navigator.vibrate) navigator.vibrate(ms);
         }
 
         function playSound(id) {
@@ -337,23 +438,17 @@
 
         function onScanSuccess(decodedText) {
             if (!isValidPaseLibre(decodedText)) {
-                showMessage("Formato QR no válido", "red");
-                playSound('errorSound');
-                vibrate(300);
+                showResult(false, "Formato QR no válido");
                 return;
             }
             
             const normalized = decodedText.trim().toUpperCase();
             if (scanned.has(normalized)) {
-                showMessage("¡Ya escaneado!", "red");
-                playSound('errorSound');
-                vibrate(300);
+                showResult(false, "¡Ya escaneado!");
             } else {
                 scanned.add(normalized);
                 scannedArr.push(normalized);
-                showMessage("¡Escaneado correctamente!", "green");
-                playSound('successSound');
-                vibrate(100);
+                showResult(true, "¡Escaneado correctamente!");
                 updateList();
             }
         }
@@ -377,10 +472,12 @@
         // Inicializar lista vacía al cargar
         updateList();
         
-        // Intentar iniciar automáticamente en dispositivos con pantalla grande
-        if (window.innerWidth > 768) {
-            setTimeout(initCamera, 1000);
-        }
+        // Detener la cámara al cerrar la página
+        window.addEventListener('beforeunload', () => {
+            if (cameraActive) {
+                stopCamera();
+            }
+        });
     </script>
 </body>
 </html>
