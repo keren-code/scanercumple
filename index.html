@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Escáner QR Único</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
         body {
             font-family: 'Roboto', Arial, sans-serif;
             background: linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 100%);
@@ -15,78 +19,82 @@
             padding: 0;
             min-height: 100vh;
             color: #22223b;
+            touch-action: manipulation;
         }
         .container {
-            max-width: 420px;
-            margin: 32px auto;
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
             background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 4px 24px rgba(30, 41, 59, 0.10);
-            padding: 28px 18px 24px 18px;
+            padding: 20px 15px;
+            min-height: 100vh;
         }
         h1 {
             text-align: center;
             color: #2563eb;
-            margin-bottom: 18px;
-            font-size: 2rem;
+            margin: 0 0 20px 0;
+            font-size: 1.8rem;
             font-weight: 700;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            padding-top: 10px;
         }
         .range-inputs {
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-bottom: 12px;
+            margin-bottom: 15px;
             flex-wrap: wrap;
         }
         .range-inputs label {
             font-weight: 500;
             color: #334155;
+            font-size: 0.9rem;
         }
         .range-inputs input {
             width: 70px;
-            padding: 5px 8px;
+            padding: 8px;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
             font-size: 1em;
-            margin-left: 3px;
         }
         button {
             background: linear-gradient(90deg, #2563eb 60%, #22d3ee 100%);
             color: #fff;
             border: none;
             border-radius: 7px;
-            padding: 8px 18px;
+            padding: 12px 20px;
             font-size: 1em;
             font-weight: 600;
             cursor: pointer;
-            margin: 8px 0 16px 0;
+            margin: 8px 0;
             transition: background 0.2s;
             box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+            width: 100%;
+            touch-action: manipulation;
         }
-        button:hover {
+        button:hover, button:active {
             background: linear-gradient(90deg, #1e40af 60%, #06b6d4 100%);
         }
         #reader {
             width: 100% !important;
-            max-width: 320px;
-            margin: 0 auto 10px auto;
+            margin: 0 auto 15px auto;
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 2px 8px rgba(30, 41, 59, 0.10);
             background: #f1f5f9;
-            min-height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
+            min-height: 250px;
+            position: relative;
+        }
+        #reader__dashboard_section_csr {
+            background: white;
+            padding: 10px;
         }
         #message {
             font-size: 1.1em;
-            margin: 10px 0;
+            margin: 15px 0;
             text-align: center;
             font-weight: 600;
-            padding: 7px 0;
+            padding: 10px;
             border-radius: 6px;
             min-height: 28px;
         }
@@ -104,28 +112,42 @@
             margin-top: 18px;
             background: #f9fafb;
             border-radius: 8px;
-            padding: 10px 12px;
+            padding: 12px;
             font-size: 1em;
             min-height: 40px;
             box-shadow: 0 1px 4px rgba(30, 41, 59, 0.06);
+            max-height: 200px;
+            overflow-y: auto;
         }
         #scanned-list b {
             color: #2563eb;
         }
-        .camera-permission {
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .camera-controls button {
+            flex: 1;
+        }
+        .button-danger {
+            background: linear-gradient(90deg, #ef4444 60%, #f87171 100%) !important;
+        }
+        .button-danger:hover, .button-danger:active {
+            background: linear-gradient(90deg, #dc2626 60%, #ef4444 100%) !important;
+        }
+        .scan-instructions {
             text-align: center;
-            padding: 20px;
+            margin: 10px 0;
+            color: #64748b;
+            font-size: 0.9rem;
         }
-        .camera-permission button {
-            margin-top: 10px;
-        }
-        @media (max-width: 600px) {
+        @media (min-width: 768px) {
             .container {
-                max-width: 98vw;
-                padding: 10px 2vw 18px 2vw;
-            }
-            #reader {
-                max-width: 98vw;
+                max-width: 420px;
+                margin: 20px auto;
+                border-radius: 18px;
+                min-height: auto;
             }
         }
     </style>
@@ -133,25 +155,29 @@
 <body>
     <div class="container">
         <h1>Escáner QR Único</h1>
+        
         <div class="range-inputs">
             <label>Desde: <input type="number" id="rangeStart" value="1"></label>
             <label>Hasta: <input type="number" id="rangeEnd" value="100"></label>
-            <button onclick="setRange()">Rango</button>
+            <button onclick="setRange()">Establecer Rango</button>
         </div>
-        <div id="reader">
-            <div class="camera-permission" id="camera-permission">
-                <p>Para escanear códigos QR, necesitamos acceso a tu cámara.</p>
-                <button onclick="initScanner()">Activar Cámara</button>
-            </div>
-            <!-- Iconos de feedback visual -->
-            <div id="scan-feedback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; text-align:center;">
-                <div id="feedback-icon" style="font-size:60px;"></div>
-                <div id="feedback-text" style="font-size:1.2em; font-weight:bold; margin-top:8px;"></div>
-            </div>
+        
+        <div class="camera-controls">
+            <button onclick="initCamera()" id="startCameraBtn">Activar Cámara</button>
+            <button onclick="stopCamera()" class="button-danger" id="stopCameraBtn" disabled>Detener Cámara</button>
         </div>
+        
+        <div class="scan-instructions">
+            Apunta la cámara hacia un código QR para escanearlo
+        </div>
+        
+        <div id="reader"></div>
+        
         <div id="message"></div>
-        <button onclick="exportPDF()" style="width:100%;">Exportar a PDF</button>
-        <button onclick="clearRegistro()" style="width:100%;background:#ef4444;margin-bottom:10px;">Borrar registro</button>
+        
+        <button onclick="exportPDF()">Exportar a PDF</button>
+        <button onclick="clearRegistro()" class="button-danger">Borrar registro</button>
+        
         <div id="scanned-list"></div>
     </div>
 
@@ -163,60 +189,77 @@
         let scanned = new Set(JSON.parse(localStorage.getItem('scannedArr') || "[]"));
         let scannedArr = Array.from(scanned);
         let rangeStart = 1, rangeEnd = 100;
-        let html5QrcodeScanner = null;
+        let html5QrCode = null;
         let cameraActive = false;
 
-        // Verificar si hay una cámara disponible
-        async function checkCamera() {
+        // Inicializar la cámara
+        async function initCamera() {
             try {
-                const devices = await Html5Qrcode.getCameras();
-                return devices && devices.length > 0;
-            } catch (error) {
-                console.error("Error al verificar cámaras:", error);
-                return false;
-            }
-        }
-
-        // Inicializar el escáner
-        async function initScanner() {
-            const hasCamera = await checkCamera();
-            if (!hasCamera) {
-                showMessage("No se detectó ninguna cámara disponible.", "red");
-                return;
-            }
-
-            try {
-                document.getElementById('camera-permission').style.display = 'none';
+                showMessage("Iniciando cámara...", "");
                 
-                html5QrcodeScanner = new Html5QrcodeScanner(
-                    "reader", 
-                    { 
-                        fps: 10, 
-                        qrbox: { width: 250, height: 250 }, 
-                        aspectRatio: 1.0,
-                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-                    }
+                // Verificar si ya hay una instancia activa
+                if (html5QrCode && html5QrCode.isScanning) {
+                    showMessage("La cámara ya está activa", "green");
+                    return;
+                }
+                
+                // Crear una nueva instancia del escáner
+                html5QrCode = new Html5Qrcode("reader");
+                
+                // Configuración para móviles
+                const config = { 
+                    fps: 10, 
+                    qrbox: { width: 250, height: 150 },
+                    aspectRatio: 1.0,
+                    focusMode: "continuous"
+                };
+                
+                // Obtener la cámara trasera por defecto en móviles
+                const cameras = await Html5Qrcode.getCameras();
+                let cameraId = null;
+                
+                if (cameras && cameras.length > 0) {
+                    // Preferir cámara trasera en dispositivos móviles
+                    const rearCamera = cameras.find(cam => cam.label.toLowerCase().includes('back'));
+                    cameraId = rearCamera ? rearCamera.id : cameras[0].id;
+                }
+                
+                // Iniciar el escáner
+                await html5QrCode.start(
+                    cameraId, 
+                    config, 
+                    onScanSuccess, 
+                    onScanError
                 );
                 
-                html5QrcodeScanner.render(onScanSuccess, onScanError);
                 cameraActive = true;
+                document.getElementById('startCameraBtn').disabled = true;
+                document.getElementById('stopCameraBtn').disabled = false;
+                showMessage("Cámara activada. Escaneando...", "green");
                 
             } catch (error) {
-                console.error("Error al inicializar el escáner:", error);
-                showMessage("Error al iniciar la cámara: " + error.message, "red");
-                document.getElementById('camera-permission').style.display = 'block';
+                console.error("Error al iniciar la cámara:", error);
+                showMessage("Error al activar la cámara: " + error.message, "red");
+                cameraActive = false;
+                document.getElementById('startCameraBtn').disabled = false;
+                document.getElementById('stopCameraBtn').disabled = true;
             }
         }
 
-        // Detener el escáner
-        function stopScanner() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear().then(() => {
+        // Detener la cámara
+        async function stopCamera() {
+            try {
+                if (html5QrCode && cameraActive) {
+                    await html5QrCode.stop();
+                    html5QrCode.clear();
                     cameraActive = false;
-                    document.getElementById('camera-permission').style.display = 'block';
-                }).catch(error => {
-                    console.error("Error al detener el escáner:", error);
-                });
+                    document.getElementById('startCameraBtn').disabled = false;
+                    document.getElementById('stopCameraBtn').disabled = true;
+                    showMessage("Cámara detenida", "");
+                }
+            } catch (error) {
+                console.error("Error al detener la cámara:", error);
+                showMessage("Error al detener la cámara", "red");
             }
         }
 
@@ -229,7 +272,7 @@
         function showMessage(msg, color) {
             const el = document.getElementById('message');
             el.textContent = msg;
-            el.className = color;
+            el.className = color ? color : '';
         }
 
         function vibrate(ms) {
@@ -239,7 +282,7 @@
         function playSound(id) {
             const audio = document.getElementById(id);
             audio.currentTime = 0;
-            audio.play();
+            audio.play().catch(e => console.log("Error reproduciendo sonido:", e));
         }
 
         function updateList() {
@@ -256,27 +299,8 @@
                 scanned.clear();
                 scannedArr = [];
                 updateList();
+                showMessage("Registros borrados", "");
             }
-        }
-
-        // Feedback visual sobre el lector
-        function showScanFeedback(type, message) {
-            const feedback = document.getElementById('scan-feedback');
-            const icon = document.getElementById('feedback-icon');
-            const text = document.getElementById('feedback-text');
-            if (type === 'success') {
-                icon.innerHTML = '✅';
-                icon.style.color = '#22c55e';
-                text.innerText = message || '¡Ingrese!';
-                text.style.color = '#22c55e';
-            } else if (type === 'error') {
-                icon.innerHTML = '❌';
-                icon.style.color = '#ef4444';
-                text.innerText = message || '¡Ya escaneado!';
-                text.style.color = '#ef4444';
-            }
-            feedback.style.display = 'block';
-            setTimeout(() => { feedback.style.display = 'none'; }, 1500);
         }
 
         // Acepta "PASE LIBRE 001" en adelante
@@ -308,27 +332,26 @@
             });
             
             doc.save("escaneados.pdf");
+            showMessage("PDF exportado correctamente", "green");
         }
 
         function onScanSuccess(decodedText) {
             if (!isValidPaseLibre(decodedText)) {
-                showMessage("Solo se aceptan QR con formato: PASE LIBRE 001 en adelante", "red");
-                showScanFeedback('error', 'Formato inválido');
+                showMessage("Formato QR no válido", "red");
                 playSound('errorSound');
                 vibrate(300);
                 return;
             }
+            
             const normalized = decodedText.trim().toUpperCase();
             if (scanned.has(normalized)) {
                 showMessage("¡Ya escaneado!", "red");
-                showScanFeedback('error', '¡Ya escaneado!');
                 playSound('errorSound');
                 vibrate(300);
             } else {
                 scanned.add(normalized);
                 scannedArr.push(normalized);
                 showMessage("¡Escaneado correctamente!", "green");
-                showScanFeedback('success', '¡Ingrese!');
                 playSound('successSound');
                 vibrate(100);
                 updateList();
@@ -337,30 +360,27 @@
 
         // Manejo de error de cámara
         function onScanError(errorMessage) {
-            // NotReadableError suele indicar que la cámara está en uso por otra app o no está disponible
-            if (errorMessage && errorMessage.toLowerCase().includes('notreadableerror')) {
-                showMessage("No se puede acceder a la cámara (puede estar en uso por otra aplicación o bloqueada). Cierra otras apps de cámara y vuelve a intentarlo.", "red");
-            } else if (errorMessage && errorMessage.toLowerCase().includes('notallowederror')) {
-                showMessage("Permiso de cámara denegado. Permite el acceso a la cámara en tu navegador.", "red");
-            } else {
-                showMessage("Error al acceder a la cámara. Verifica permisos y recarga la página.", "red");
+            // No mostrar errores menores continuos
+            if (!errorMessage || errorMessage.includes('NotFoundException')) {
+                return;
             }
             
-            // Reactivar el botón para intentar de nuevo
-            document.getElementById('camera-permission').style.display = 'block';
-            cameraActive = false;
+            console.error("Error de escaneo:", errorMessage);
+            
+            if (errorMessage.includes('NotAllowedError')) {
+                showMessage("Permiso de cámara denegado", "red");
+            } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('NotReadableError')) {
+                showMessage("Cámara no disponible", "red");
+            }
         }
 
         // Inicializar lista vacía al cargar
         updateList();
         
-        // Verificar si hay cámara disponible al cargar la página
-        window.addEventListener('load', async function() {
-            const hasCamera = await checkCamera();
-            if (!hasCamera) {
-                showMessage("No se detectó ninguna cámara disponible.", "red");
-            }
-        });
+        // Intentar iniciar automáticamente en dispositivos con pantalla grande
+        if (window.innerWidth > 768) {
+            setTimeout(initCamera, 1000);
+        }
     </script>
 </body>
 </html>
