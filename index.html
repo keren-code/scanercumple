@@ -153,6 +153,8 @@
             box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
             transform: scale(0.9);
             transition: transform 0.3s ease;
+            width: 85%;
+            max-width: 350px;
         }
         .scan-result.show .result-content {
             transform: scale(1);
@@ -201,6 +203,13 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+        .accept-button {
+            background: linear-gradient(90deg, #16a34a 60%, #22c55e 100%) !important;
+            margin-top: 15px;
+        }
+        .accept-button:hover, .accept-button:active {
+            background: linear-gradient(90deg, #15803d 60%, #16a34a 100%) !important;
+        }
     </style>
 </head>
 <body>
@@ -208,8 +217,8 @@
         <h1>Escáner QR con Confirmación</h1>
         
         <div class="range-inputs">
-            <label>Desde: <input type="number" id="rangeStart" value="1"></label>
-            <label>Hasta: <input type="number" id="rangeEnd" value="100"></label>
+            <label>Desde: <input type="number" id="rangeStart" value="1" min="1" max="30"></label>
+            <label>Hasta: <input type="number" id="rangeEnd" value="30" min="1" max="30"></label>
         </div>
         
         <div class="scanner-status">
@@ -243,22 +252,24 @@
         <div class="result-content">
             <div class="result-icon" id="resultIcon"></div>
             <h2 id="resultText">Resultado</h2>
-            <button onclick="hideResult()">
-                <i class="fas fa-sync-alt"></i> Volver a escanear
+            <p id="resultDescription"></p>
+            <button onclick="hideResult()" class="accept-button" id="acceptButton">
+                <i class="fas fa-check-circle"></i> Aceptar
             </button>
         </div>
     </div>
 
-    <audio id="successSound" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa4b7b.mp3"></audio>
-    <audio id="errorSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b7b7c.mp3"></audio>
+    <audio id="successSound" src="https://assets.mixkit.co/sfx/preview/mixkit-game-ball-tap-2073.mp3"></audio>
+    <audio id="errorSound" src="https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3"></audio>
 
     <script>
         // Utiliza localStorage para persistencia
         let scanned = new Set(JSON.parse(localStorage.getItem('scannedArr') || "[]"));
         let scannedArr = Array.from(scanned);
-        let rangeStart = 1, rangeEnd = 100;
+        let rangeStart = 1, rangeEnd = 30;
         let html5QrCode = null;
         let cameraActive = false;
+        let lastScannedCode = '';
 
         // Elementos DOM
         const statusDot = document.getElementById('statusDot');
@@ -267,6 +278,12 @@
         const scanResult = document.getElementById('scanResult');
         const resultIcon = document.getElementById('resultIcon');
         const resultText = document.getElementById('resultText');
+        const resultDescription = document.getElementById('resultDescription');
+        const acceptButton = document.getElementById('acceptButton');
+
+        // Inicializar valores de rango
+        document.getElementById('rangeStart').value = rangeStart;
+        document.getElementById('rangeEnd').value = rangeEnd;
 
         // Alternar estado de la cámara
         async function toggleCamera() {
@@ -336,24 +353,30 @@
         }
 
         // Mostrar resultado del escaneo
-        function showResult(success, message) {
+        function showResult(success, message, description) {
             if (success) {
                 resultIcon.className = 'result-icon success';
                 resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
                 resultText.textContent = message;
                 resultText.style.color = '#22c55e';
+                resultDescription.textContent = description;
+                resultDescription.style.color = '#334155';
+                acceptButton.style.display = 'block';
             } else {
                 resultIcon.className = 'result-icon error';
                 resultIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
                 resultText.textContent = message;
                 resultText.style.color = '#ef4444';
+                resultDescription.textContent = description;
+                resultDescription.style.color = '#64748b';
+                acceptButton.style.display = 'block';
             }
             
             scanResult.classList.add('show');
             
-            // Vibrar
-            if (navigator.vibrate) {
-                navigator.vibrate(success ? 100 : 300);
+            // Vibrar solo en caso de error
+            if (navigator.vibrate && !success) {
+                navigator.vibrate(300);
             }
             
             // Reproducir sonido
@@ -406,7 +429,7 @@
 
         // Acepta "PASE LIBRE 001" en adelante
         function isValidPaseLibre(code) {
-            const regex = /^PASE LIBRE (\d{3,})$/i;
+            const regex = /^PASE LIBRE (\d{1,3})$/i;
             const match = code.trim().match(regex);
             if (!match) return false;
             const num = parseInt(match[1], 10);
@@ -437,18 +460,22 @@
         }
 
         function onScanSuccess(decodedText) {
+            // Evitar múltiples escaneos rápidos
+            if (decodedText === lastScannedCode) return;
+            lastScannedCode = decodedText;
+            
             if (!isValidPaseLibre(decodedText)) {
-                showResult(false, "Formato QR no válido");
+                showResult(false, "Código no válido", "El formato debe ser: PASE LIBRE 001");
                 return;
             }
             
             const normalized = decodedText.trim().toUpperCase();
             if (scanned.has(normalized)) {
-                showResult(false, "¡Ya escaneado!");
+                showResult(false, "Código ya escaneado", "Este código ya fue registrado anteriormente");
             } else {
                 scanned.add(normalized);
                 scannedArr.push(normalized);
-                showResult(true, "¡Escaneado correctamente!");
+                showResult(true, "¡Válido! Ingresa", "Código escaneado correctamente");
                 updateList();
             }
         }
@@ -478,6 +505,10 @@
                 stopCamera();
             }
         });
+
+        // Actualizar rango cuando cambian los inputs
+        document.getElementById('rangeStart').addEventListener('change', setRange);
+        document.getElementById('rangeEnd').addEventListener('change', setRange);
     </script>
 </body>
 </html>
