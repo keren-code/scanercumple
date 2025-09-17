@@ -75,6 +75,11 @@
             overflow: hidden;
             box-shadow: 0 2px 8px rgba(30, 41, 59, 0.10);
             background: #f1f5f9;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
         }
         #message {
             font-size: 1.1em;
@@ -107,6 +112,13 @@
         #scanned-list b {
             color: #2563eb;
         }
+        .camera-permission {
+            text-align: center;
+            padding: 20px;
+        }
+        .camera-permission button {
+            margin-top: 10px;
+        }
         @media (max-width: 600px) {
             .container {
                 max-width: 98vw;
@@ -126,7 +138,11 @@
             <label>Hasta: <input type="number" id="rangeEnd" value="100"></label>
             <button onclick="setRange()">Rango</button>
         </div>
-        <div id="reader" style="position:relative;">
+        <div id="reader">
+            <div class="camera-permission" id="camera-permission">
+                <p>Para escanear códigos QR, necesitamos acceso a tu cámara.</p>
+                <button onclick="initScanner()">Activar Cámara</button>
+            </div>
             <!-- Iconos de feedback visual -->
             <div id="scan-feedback" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; text-align:center;">
                 <div id="feedback-icon" style="font-size:60px;"></div>
@@ -147,6 +163,62 @@
         let scanned = new Set(JSON.parse(localStorage.getItem('scannedArr') || "[]"));
         let scannedArr = Array.from(scanned);
         let rangeStart = 1, rangeEnd = 100;
+        let html5QrcodeScanner = null;
+        let cameraActive = false;
+
+        // Verificar si hay una cámara disponible
+        async function checkCamera() {
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                return devices && devices.length > 0;
+            } catch (error) {
+                console.error("Error al verificar cámaras:", error);
+                return false;
+            }
+        }
+
+        // Inicializar el escáner
+        async function initScanner() {
+            const hasCamera = await checkCamera();
+            if (!hasCamera) {
+                showMessage("No se detectó ninguna cámara disponible.", "red");
+                return;
+            }
+
+            try {
+                document.getElementById('camera-permission').style.display = 'none';
+                
+                html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader", 
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 }, 
+                        aspectRatio: 1.0,
+                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+                    }
+                );
+                
+                html5QrcodeScanner.render(onScanSuccess, onScanError);
+                cameraActive = true;
+                
+            } catch (error) {
+                console.error("Error al inicializar el escáner:", error);
+                showMessage("Error al iniciar la cámara: " + error.message, "red");
+                document.getElementById('camera-permission').style.display = 'block';
+            }
+        }
+
+        // Detener el escáner
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear().then(() => {
+                    cameraActive = false;
+                    document.getElementById('camera-permission').style.display = 'block';
+                }).catch(error => {
+                    console.error("Error al detener el escáner:", error);
+                });
+            }
+        }
 
         function setRange() {
             rangeStart = parseInt(document.getElementById('rangeStart').value);
@@ -224,9 +296,17 @@
             doc.text("Códigos escaneados:", 10, 15);
             doc.setFont("helvetica", "normal");
             doc.setFontSize(12);
+            
+            let yPosition = 25;
             scannedArr.forEach((code, i) => {
-                doc.text(`${i+1}. ${code}`, 10, 25 + i*8);
+                if (yPosition > 270) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+                doc.text(`${i+1}. ${code}`, 10, yPosition);
+                yPosition += 8;
             });
+            
             doc.save("escaneados.pdf");
         }
 
@@ -265,14 +345,22 @@
             } else {
                 showMessage("Error al acceder a la cámara. Verifica permisos y recarga la página.", "red");
             }
+            
+            // Reactivar el botón para intentar de nuevo
+            document.getElementById('camera-permission').style.display = 'block';
+            cameraActive = false;
         }
-
-        let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", { fps: 10, qrbox: 250, aspectRatio: 1 });
-        html5QrcodeScanner.render(onScanSuccess, onScanError);
 
         // Inicializar lista vacía al cargar
         updateList();
+        
+        // Verificar si hay cámara disponible al cargar la página
+        window.addEventListener('load', async function() {
+            const hasCamera = await checkCamera();
+            if (!hasCamera) {
+                showMessage("No se detectó ninguna cámara disponible.", "red");
+            }
+        });
     </script>
 </body>
 </html>
