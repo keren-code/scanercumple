@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Escáner QR con Confirmación</title>
+    <title>Escáner QR con Registro Completo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -112,6 +112,11 @@
             background: #22c55e;
             border: 1px solid #15803d;
         }
+        #message.black {
+            color: #fff;
+            background: #4b5563;
+            border: 1px solid #374151;
+        }
         #scanned-list {
             margin-top: 18px;
             background: #f9fafb;
@@ -123,8 +128,22 @@
             max-height: 200px;
             overflow-y: auto;
         }
-        #scanned-list b {
+        .scan-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .scan-item:last-child {
+            border-bottom: none;
+        }
+        .scan-code {
+            font-weight: bold;
             color: #2563eb;
+        }
+        .scan-time {
+            color: #64748b;
+            font-size: 0.85em;
         }
         .scan-result {
             position: fixed;
@@ -210,11 +229,17 @@
         .accept-button:hover, .accept-button:active {
             background: linear-gradient(90deg, #15803d 60%, #16a34a 100%) !important;
         }
+        .scanned-count {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #2563eb;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Escáner QR con Confirmación</h1>
+        <h1>Escáner QR con Registro</h1>
         
         <div class="range-inputs">
             <label>Desde: <input type="number" id="rangeStart" value="1" min="1" max="30"></label>
@@ -238,6 +263,8 @@
         
         <div id="message"></div>
         
+        <div class="scanned-count" id="scannedCount">Total escaneados: 0</div>
+        
         <button onclick="exportPDF()">
             <i class="fas fa-file-pdf"></i> Exportar a PDF
         </button>
@@ -253,19 +280,23 @@
             <div class="result-icon" id="resultIcon"></div>
             <h2 id="resultText">Resultado</h2>
             <p id="resultDescription"></p>
+            <p id="resultTime"></p>
             <button onclick="hideResult()" class="accept-button" id="acceptButton">
                 <i class="fas fa-check-circle"></i> Aceptar
             </button>
         </div>
     </div>
 
+    <audio id="firstScanSound" src="https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3"></audio>
     <audio id="successSound" src="https://assets.mixkit.co/sfx/preview/mixkit-game-ball-tap-2073.mp3"></audio>
     <audio id="errorSound" src="https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3"></audio>
 
     <script>
         // Utiliza localStorage para persistencia
-        let scanned = new Set(JSON.parse(localStorage.getItem('scannedArr') || "[]"));
-        let scannedArr = Array.from(scanned);
+        let scannedCodes = JSON.parse(localStorage.getItem('scannedCodes') || "{}");
+        let scannedArr = Object.keys(scannedCodes).map(code => {
+            return { code, time: scannedCodes[code] };
+        });
         let rangeStart = 1, rangeEnd = 30;
         let html5QrCode = null;
         let cameraActive = false;
@@ -279,11 +310,26 @@
         const resultIcon = document.getElementById('resultIcon');
         const resultText = document.getElementById('resultText');
         const resultDescription = document.getElementById('resultDescription');
+        const resultTime = document.getElementById('resultTime');
         const acceptButton = document.getElementById('acceptButton');
+        const scannedCount = document.getElementById('scannedCount');
 
         // Inicializar valores de rango
         document.getElementById('rangeStart').value = rangeStart;
         document.getElementById('rangeEnd').value = rangeEnd;
+
+        // Formatear fecha y hora
+        function formatDateTime(date) {
+            const options = { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            };
+            return date.toLocaleString('es-ES', options);
+        }
 
         // Alternar estado de la cámara
         async function toggleCamera() {
@@ -353,7 +399,10 @@
         }
 
         // Mostrar resultado del escaneo
-        function showResult(success, message, description) {
+        function showResult(success, message, description, isFirstScan = false) {
+            const now = new Date();
+            const formattedTime = formatDateTime(now);
+            
             if (success) {
                 resultIcon.className = 'result-icon success';
                 resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
@@ -361,7 +410,12 @@
                 resultText.style.color = '#22c55e';
                 resultDescription.textContent = description;
                 resultDescription.style.color = '#334155';
+                resultTime.textContent = formattedTime;
+                resultTime.style.color = '#64748b';
                 acceptButton.style.display = 'block';
+                
+                // Reproducir sonido específico para primer escaneo
+                playSound(isFirstScan ? 'firstScanSound' : 'successSound');
             } else {
                 resultIcon.className = 'result-icon error';
                 resultIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
@@ -369,18 +423,20 @@
                 resultText.style.color = '#ef4444';
                 resultDescription.textContent = description;
                 resultDescription.style.color = '#64748b';
+                resultTime.textContent = formattedTime;
+                resultTime.style.color = '#64748b';
                 acceptButton.style.display = 'block';
+                
+                // Reproducir sonido de error
+                playSound('errorSound');
+                
+                // Vibrar en caso de error
+                if (navigator.vibrate) {
+                    navigator.vibrate(300);
+                }
             }
             
             scanResult.classList.add('show');
-            
-            // Vibrar solo en caso de error
-            if (navigator.vibrate && !success) {
-                navigator.vibrate(300);
-            }
-            
-            // Reproducir sonido
-            playSound(success ? 'successSound' : 'errorSound');
             
             // Detener la cámara automáticamente
             stopCamera();
@@ -410,17 +466,33 @@
         }
 
         function updateList() {
-            document.getElementById('scanned-list').innerHTML =
-                scannedArr.length
-                ? "<b>Escaneados:</b><br>" + scannedArr.join('<br>')
-                : "<b>No hay códigos escaneados aún.</b>";
+            const listElement = document.getElementById('scanned-list');
+            const countElement = document.getElementById('scannedCount');
+            
+            if (scannedArr.length > 0) {
+                listElement.innerHTML = "<b>Registro de escaneos:</b>";
+                scannedArr.forEach(item => {
+                    const scanItem = document.createElement('div');
+                    scanItem.className = 'scan-item';
+                    scanItem.innerHTML = `
+                        <span class="scan-code">${item.code}</span>
+                        <span class="scan-time">${formatDateTime(new Date(item.time))}</span>
+                    `;
+                    listElement.appendChild(scanItem);
+                });
+            } else {
+                listElement.innerHTML = "<b>No hay códigos escaneados aún.</b>";
+            }
+            
+            countElement.textContent = `Total escaneados: ${scannedArr.length}`;
+            
             // Actualiza localStorage
-            localStorage.setItem('scannedArr', JSON.stringify(scannedArr));
+            localStorage.setItem('scannedCodes', JSON.stringify(scannedCodes));
         }
 
         function clearRegistro() {
             if (confirm("¿Seguro que deseas borrar todos los registros?")) {
-                scanned.clear();
+                scannedCodes = {};
                 scannedArr = [];
                 updateList();
                 showMessage("Registros borrados", "");
@@ -441,21 +513,21 @@
             const doc = new jsPDF();
             doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
-            doc.text("Códigos escaneados:", 10, 15);
+            doc.text("Registro de Códigos Escaneados", 10, 15);
             doc.setFont("helvetica", "normal");
             doc.setFontSize(12);
             
             let yPosition = 25;
-            scannedArr.forEach((code, i) => {
+            scannedArr.forEach((item, i) => {
                 if (yPosition > 270) {
                     doc.addPage();
                     yPosition = 20;
                 }
-                doc.text(`${i+1}. ${code}`, 10, yPosition);
+                doc.text(`${i+1}. ${item.code} - ${formatDateTime(new Date(item.time))}`, 10, yPosition);
                 yPosition += 8;
             });
             
-            doc.save("escaneados.pdf");
+            doc.save("registro_escaneos.pdf");
             showMessage("PDF exportado correctamente", "green");
         }
 
@@ -465,17 +537,20 @@
             lastScannedCode = decodedText;
             
             if (!isValidPaseLibre(decodedText)) {
-                showResult(false, "Código no válido", "El formato debe ser: PASE LIBRE 001");
+                showResult(false, "Código no válido", "El formato debe ser: PASE LIBRE 001", false);
                 return;
             }
             
             const normalized = decodedText.trim().toUpperCase();
-            if (scanned.has(normalized)) {
-                showResult(false, "Código ya escaneado", "Este código ya fue registrado anteriormente");
+            const now = new Date();
+            
+            if (scannedCodes[normalized]) {
+                showResult(false, "Código ya escaneado", "Este código ya fue registrado anteriormente", false);
             } else {
-                scanned.add(normalized);
-                scannedArr.push(normalized);
-                showResult(true, "¡Válido! Ingresa", "Código escaneado correctamente");
+                // Es la primera vez que se escanea este código
+                scannedCodes[normalized] = now.toISOString();
+                scannedArr.push({ code: normalized, time: now.toISOString() });
+                showResult(true, "¡Válido! Ingresa", "Código escaneado correctamente", true);
                 updateList();
             }
         }
