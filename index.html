@@ -169,11 +169,11 @@
                 : "<b>No hay códigos escaneados aún.</b>";
         }
 
-        // Solo acepta QR que sean exactamente "Pase Libre 001" hasta el rango indicado
+        // Acepta "PASE LIBRE 001" en adelante, sin límite superior si rangeEnd es vacío
         function isValidPaseLibre(code) {
-            // Formato esperado: "Pase Libre 001", "Pase Libre 002", etc.
-            const regex = /^Pase Libre (\d{3})$/;
-            const match = code.match(regex);
+            // Permite mayúsculas/minúsculas y espacios extra
+            const regex = /^PASE LIBRE (\d{3,})$/i;
+            const match = code.trim().match(regex);
             if (!match) return false;
             const num = parseInt(match[1], 10);
             return num >= rangeStart && num <= rangeEnd;
@@ -195,18 +195,20 @@
 
         function onScanSuccess(decodedText) {
             if (!isValidPaseLibre(decodedText)) {
-                showMessage("Solo se aceptan QR con formato: Pase Libre 001 hasta el rango indicado", "red");
+                showMessage("Solo se aceptan QR con formato: PASE LIBRE 001 en adelante", "red");
                 playSound('errorSound');
                 vibrate(300);
                 return;
             }
-            if (scanned.has(decodedText)) {
+            // Normaliza el texto para evitar duplicados por mayúsculas/minúsculas
+            const normalized = decodedText.trim().toUpperCase();
+            if (scanned.has(normalized)) {
                 showMessage("¡Ya escaneado!", "red");
                 playSound('errorSound');
                 vibrate(300);
             } else {
-                scanned.add(decodedText);
-                scannedArr.push(decodedText);
+                scanned.add(normalized);
+                scannedArr.push(normalized);
                 showMessage("¡Escaneado correctamente!", "green");
                 playSound('successSound');
                 vibrate(100);
