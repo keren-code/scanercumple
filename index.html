@@ -257,7 +257,14 @@
 
         // Manejo de error de cámara
         function onScanError(errorMessage) {
-            showMessage("Error al acceder a la cámara. Verifica permisos y recarga la página.", "red");
+            // NotReadableError suele indicar que la cámara está en uso por otra app o no está disponible
+            if (errorMessage && errorMessage.toLowerCase().includes('notreadableerror')) {
+                showMessage("No se puede acceder a la cámara (puede estar en uso por otra aplicación o bloqueada). Cierra otras apps de cámara y vuelve a intentarlo.", "red");
+            } else if (errorMessage && errorMessage.toLowerCase().includes('notallowederror')) {
+                showMessage("Permiso de cámara denegado. Permite el acceso a la cámara en tu navegador.", "red");
+            } else {
+                showMessage("Error al acceder a la cámara. Verifica permisos y recarga la página.", "red");
+            }
         }
 
         let html5QrcodeScanner = new Html5QrcodeScanner(
